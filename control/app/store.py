@@ -2298,13 +2298,21 @@ def list_threads(instance: str) -> list:
     return [dict(r) for r in rows]
 
 
-def list_messages(instance: str, peer: str, limit: int = 200) -> list:
+def list_messages(instance: str, peer: str, limit: int = 200,
+                  before_id: int | None = None) -> list:
+    """Newest page, returned in display order; an exclusive ID cursor avoids gaps."""
+    limit = max(1, min(int(limit), 250))
+    where = "instance=? AND peer=?"
+    args = [str(instance), peer]
+    if before_id is not None:
+        where += " AND id < ?"
+        args.append(int(before_id))
     with _lock, _conn() as c:
         rows = c.execute(
-            "SELECT * FROM messages WHERE instance=? AND peer=? ORDER BY ts ASC LIMIT ?",
-            (str(instance), peer, limit),
+            f"SELECT * FROM messages WHERE {where} ORDER BY id DESC LIMIT ?",
+            (*args, limit),
         ).fetchall()
-        return _with_mms(c, [dict(r) for r in rows])
+        return _with_mms(c, [dict(r) for r in reversed(rows)])
 
 
 def recent_messages(instance: str, limit: int = 10) -> list:

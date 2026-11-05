@@ -38,6 +38,18 @@ class ReadStateTests(unittest.TestCase):
         record = store.add_message(instance, direction, peer, body, ts=ts or self.clock)
         return int(record["id"])
 
+    def test_latest_messages_and_backward_pages_do_not_skip_equal_timestamps(self):
+        ids = [self.arrive(str(index), ts=1700000000) for index in range(305)]
+        self.arrive("other line", instance=OTHER_LINE)
+        latest = store.list_messages(LINE, PEER, 50)
+        self.assertEqual([row["id"] for row in latest], ids[-50:])
+        collected = latest
+        while latest:
+            latest = store.list_messages(LINE, PEER, 50, latest[0]["id"])
+            collected = latest + collected
+        self.assertEqual([row["id"] for row in collected], ids)
+        self.assertEqual(len(store.list_messages(LINE, PEER)), 200)
+
     def test_an_upgrade_does_not_present_the_history_as_unread(self):
         self.arrive()
         self.arrive("on the other line", instance=OTHER_LINE)

@@ -6483,8 +6483,10 @@ def api_binary_sms(iid: str, limit: int = 200):
 
 
 @app.get("/api/instances/{iid}/messages/{peer}")
-def api_messages(iid: str, peer: str):
-    return {"messages": store.list_messages(iid, peer)}
+def api_messages(iid: str, peer: str, limit: int = 200, before_id: int | None = None):
+    if not 1 <= limit <= 250 or (before_id is not None and before_id < 1):
+        raise HTTPException(422, "invalid message page")
+    return {"messages": store.list_messages(iid, peer, limit, before_id)}
 
 
 # Largest file accepted as picked: a camera original is often several megabytes and is
