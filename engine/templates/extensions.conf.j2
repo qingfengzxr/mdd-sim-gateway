@@ -1,6 +1,3 @@
-{% set local_eps = [] %}
-{% if webrtc_enable %}{% set _ = local_eps.append('PJSIP/' ~ webrtc_user) %}{% endif %}
-{% set dialstr = local_eps | join('&') %}
 {% set inbound_ring_seconds = vm_ring_seconds if vm_enabled else 60 %}
 {# Match every non-empty printable extension without Asterisk's noisy bare `_.` wildcard.
    The leading ASCII character set preserves UUID/GRUU, SIP/TEL and short-code users; the
@@ -22,7 +19,7 @@ same => n,Set(FILE(/logs/calls.txt,,,a)=IN call from ${CALLERID(num)} at ${STRFT
 same => n,TrySystem(/usr/local/bin/notify.py call_in "${CALLERID(num)}" &)
 same => n,WaitForPrecondition(10,2000)
 same => n,Ringing()
-{% if dialstr %}
+{% if webrtc_enable %}
 ; A push notification is useful only if the caller is still available after the administrator
 ; opens and signs in to the WebUI.  Dial(PJSIP/webrtc) returns CHANUNAVAIL immediately when no
 ; browser Contact exists, which used to end the call before that could happen.  Keep the inbound
@@ -37,7 +34,9 @@ same => n,Wait(1)
 same => n,Goto(wait_browser)
 same => n(dial_browser),Set(BROWSER_PICKUP_REMAINING=$[${BROWSER_PICKUP_DEADLINE}-${EPOCH}])
 same => n,GotoIf($[${BROWSER_PICKUP_REMAINING}<=0]?unanswered)
-same => n,Dial({{ dialstr }},${BROWSER_PICKUP_REMAINING})
+; Dial(PJSIP/endpoint) selects just one Contact. Ring every registered browser/app
+; using the complete '&'-separated list already resolved for this pickup attempt.
+same => n,Dial(${BROWSER_CONTACTS},${BROWSER_PICKUP_REMAINING})
 ; SIP 603 maps to Q.850 CALL_REJECTED (21), but Dial may report CHANUNAVAIL.
 ; Honour the explicit decline before considering transport recovery or voicemail.
 same => n,GotoIf($[${HANGUPCAUSE}=21]?bye)

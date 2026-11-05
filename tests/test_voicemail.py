@@ -38,7 +38,7 @@ class DialplanTests(unittest.TestCase):
         out = render(vm_enabled=False)
         self.assertIn("Set(BROWSER_PICKUP_DEADLINE=$[${EPOCH}+60])", out)
         self.assertIn("Set(BROWSER_CONTACTS=${PJSIP_DIAL_CONTACTS(webrtc)})", out)
-        self.assertIn("same => n,Dial(PJSIP/webrtc,${BROWSER_PICKUP_REMAINING})", out)
+        self.assertIn("same => n,Dial(${BROWSER_CONTACTS},${BROWSER_PICKUP_REMAINING})", out)
         self.assertIn("same => n(unanswered),NoOp(Browser pickup window expired)", out)
         self.assertNotIn("Record(", out)
         self.assertNotIn("[mdd_voicemail]", out)
@@ -68,11 +68,20 @@ class DialplanTests(unittest.TestCase):
         self.assertLess(out.index('GotoIf($["${DIALSTATUS}"="BUSY"]?bye)'),
                         out.index("Goto(mdd_voicemail,vm,1)"))
 
+    def test_all_registered_clients_are_dialled_together(self):
+        for vm_enabled in (False, True):
+            with self.subTest(vm_enabled=vm_enabled):
+                out = render(vm_enabled=vm_enabled, webrtc_user="mobile-clients")
+                resolve = out.index('Set(BROWSER_CONTACTS=${PJSIP_DIAL_CONTACTS(mobile-clients)})')
+                dial = out.index('same => n,Dial(${BROWSER_CONTACTS},${BROWSER_PICKUP_REMAINING})')
+                self.assertLess(resolve, dial)
+                self.assertNotIn('same => n,Dial(PJSIP/mobile-clients,', out)
+
     def test_sip_603_decline_stops_before_transport_retry_or_voicemail(self):
         for vm_enabled in (False, True):
             with self.subTest(vm_enabled=vm_enabled):
                 out = render(vm_enabled=vm_enabled)
-                dial = out.index('same => n,Dial(PJSIP/webrtc,')
+                dial = out.index('same => n,Dial(${BROWSER_CONTACTS},')
                 declined = out.index('same => n,GotoIf($[${HANGUPCAUSE}=21]?bye)')
                 retry = out.index('GotoIf($["${DIALSTATUS}"="CHANUNAVAIL"')
                 self.assertLess(dial, declined)
