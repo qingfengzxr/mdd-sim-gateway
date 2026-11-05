@@ -68,6 +68,17 @@ class DialplanTests(unittest.TestCase):
         self.assertLess(out.index('GotoIf($["${DIALSTATUS}"="BUSY"]?bye)'),
                         out.index("Goto(mdd_voicemail,vm,1)"))
 
+    def test_sip_603_decline_stops_before_transport_retry_or_voicemail(self):
+        for vm_enabled in (False, True):
+            with self.subTest(vm_enabled=vm_enabled):
+                out = render(vm_enabled=vm_enabled)
+                dial = out.index('same => n,Dial(PJSIP/webrtc,')
+                declined = out.index('same => n,GotoIf($[${HANGUPCAUSE}=21]?bye)')
+                retry = out.index('GotoIf($["${DIALSTATUS}"="CHANUNAVAIL"')
+                self.assertLess(dial, declined)
+                self.assertLess(declined, retry)
+                self.assertIn('same => n(bye),Hangup()', out)
+
     def test_a_line_with_no_softphone_records_instead_of_answering_into_silence(self):
         out = render(vm_enabled=True, webrtc_enable=False)
         self.assertIn("same => n,Goto(mdd_voicemail,vm,1)", out)

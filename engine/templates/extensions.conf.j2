@@ -38,6 +38,9 @@ same => n,Goto(wait_browser)
 same => n(dial_browser),Set(BROWSER_PICKUP_REMAINING=$[${BROWSER_PICKUP_DEADLINE}-${EPOCH}])
 same => n,GotoIf($[${BROWSER_PICKUP_REMAINING}<=0]?unanswered)
 same => n,Dial({{ dialstr }},${BROWSER_PICKUP_REMAINING})
+; SIP 603 maps to Q.850 CALL_REJECTED (21), but Dial may report CHANUNAVAIL.
+; Honour the explicit decline before considering transport recovery or voicemail.
+same => n,GotoIf($[${HANGUPCAUSE}=21]?bye)
 ; A Contact can disappear between the poll and Dial().  Resume waiting only for that transport
 ; race; a real decline/busy/no-answer remains the user's final decision.
 same => n,GotoIf($["${DIALSTATUS}"="CHANUNAVAIL" & ${EPOCH}<${BROWSER_PICKUP_DEADLINE}]?wait_browser)
